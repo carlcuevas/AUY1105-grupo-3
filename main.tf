@@ -1,4 +1,5 @@
 terraform {
+  required_version = ">= 1.2.0"
   required_providers {
     aws = {
       source  = "hashicorp/aws"
@@ -39,7 +40,6 @@ resource "aws_security_group" "allow_ssh" {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    # Usamos una IP interna (10.0.0.0/8) para cumplir con la politica OPA
     cidr_blocks = ["10.0.0.0/8"] 
   }
 
@@ -51,10 +51,10 @@ resource "aws_security_group" "allow_ssh" {
   }
 }
 
-# 4. Obtener AMI de Ubuntu 24.04 LTS
+# 4. AMI Ubuntu 24.04 LTS
 data "aws_ami" "ubuntu_24_04" {
   most_recent = true
-  owners      = ["099720109477"] # Canonical
+  owners      = ["099720109477"] 
   filter {
     name   = "name"
     values = ["ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-amd64-server-*"]
