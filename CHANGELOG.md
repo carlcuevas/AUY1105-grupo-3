@@ -8,3 +8,6 @@
  
 ## [1.2.0] - Pipeline CI/CD
 - Implementación de GitHub Actions (TFLint, Checkov, Validate).
+ 
+## [1.3.0] - Políticas de OPA
+- Implementación de reglas Rego para restringir SSH público y tipo de instancia.
