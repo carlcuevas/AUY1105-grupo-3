@@ -1,0 +1,45 @@
+name: "Terraform CI/CD Pipeline"
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  validate-and-lint:
+    name: "Validacion y Calidad (TFLint)"
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Checkout del código"
+        uses: actions/checkout@v4
+
+      - name: "Configurar Terraform"
+        uses: hashicorp/setup-terraform@v3
+
+      - name: "Terraform Init"
+        run: terraform init -backend=false
+
+      - name: "Terraform Validate"
+        run: terraform validate
+
+      - name: "Configurar TFLint"
+        uses: terraform-linters/setup-tflint@v3
+        with:
+          tflint_version: v0.50.3
+
+      - name: "Ejecutar TFLint"
+        run: tflint -f compact
+
+  security-scan:
+    name: "Analisis de Seguridad (Checkov)"
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Checkout del código"
+        uses: actions/checkout@v4
+
+      - name: "Ejecutar Checkov"
+        uses: bridgecrewio/checkov-action@master
+        with:
+          directory: .
+          framework: terraform
+          soft_fail: true
