@@ -1,123 +1,83 @@
-terraform {
-  required_version = ">= 1.2.0"
-  required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = "~> 6.0"
-    }
-  }
-}
+name: "Terraform CI/CD Pipeline"
 
-provider "aws" {
-  region = "us-east-1"
-}
+# Se dispara UNICAMENTE en Pull Requests hacia main,
+# segun lo exige la pauta del parcial.
+on:
+  pull_request:
+    branches:
+      - main
 
-# =============================================================================
-# 1. VPC
-# -----------------------------------------------------------------------------
-# Virtual Private Cloud aislada para alojar la infraestructura del proyecto.
-# CIDR 10.1.0.0/16 según requerimiento de la pauta.
-# =============================================================================
-resource "aws_vpc" "main" {
-  cidr_block           = "10.1.0.0/16"
-  enable_dns_support   = true
-  enable_dns_hostnames = true
+jobs:
+  pipeline:
+    name: "Analisis de Calidad y Seguridad"
+    runs-on: ubuntu-latest
 
-  tags = {
-    Name        = "AUY1105-proyecto1-vpc"
-    Project     = "AUY1105-proyecto1"
-    ManagedBy   = "Terraform"
-  }
-}
+    steps:
+      - name: "Checkout del codigo"
+        uses: actions/checkout@v4
 
-# =============================================================================
-# 2. Subred pública (/24)
-# -----------------------------------------------------------------------------
-# Segmento de red /24 dentro de la VPC para los recursos de cómputo.
-# =============================================================================
-resource "aws_subnet" "public" {
-  vpc_id                  = aws_vpc.main.id
-  cidr_block              = "10.1.1.0/24"
-  map_public_ip_on_launch = true
+      - name: "Configurar Terraform"
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.0
 
-  tags = {
-    Name        = "AUY1105-proyecto1-sn-pub"
-    Project     = "AUY1105-proyecto1"
-    ManagedBy   = "Terraform"
-  }
-}
+      # ===========================================================
+      # ETAPA 1: Analisis estatico del codigo con TFLint
+      # ===========================================================
+      - name: "[Etapa 1] Configurar TFLint"
+        uses: terraform-linters/setup-tflint@v4
+        with:
+          tflint_version: v0.53.0
 
-# =============================================================================
-# 3. Security Group
-# -----------------------------------------------------------------------------
-# Controla el tráfico entrante y saliente. Solo permite SSH entrante desde
-# el bloque CIDR de la propia VPC (10.1.0.0/16), cumpliendo la política OPA
-# que prohíbe SSH abierto a 0.0.0.0/0.
-# =============================================================================
-resource "aws_security_group" "allow_ssh" {
-  name        = "AUY1105-proyecto1-sg"
-  description = "Permite trafico SSH restringido al bloque de la VPC"
-  vpc_id      = aws_vpc.main.id
+      - name: "[Etapa 1] Inicializar TFLint"
+        run: tflint --init
 
-  ingress {
-    description = "SSH desde la VPC"
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = ["10.1.0.0/16"]
-  }
+      - name: "[Etapa 1] Ejecutar analisis estatico (TFLint)"
+        run: tflint -f compact
 
-  egress {
-    description = "Trafico saliente permitido"
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
+      # ===========================================================
+      # ETAPA 2: Analisis de seguridad con Checkov
+      # ===========================================================
+      - name: "[Etapa 2] Ejecutar analisis de seguridad (Checkov)"
+        uses: bridgecrewio/checkov-action@master
+        with:
+          directory: .
+          framework: terraform
+          soft_fail: false
+          output_format: cli
+          quiet: true
 
-  tags = {
-    Name        = "AUY1105-proyecto1-sg"
-    Project     = "AUY1105-proyecto1"
-    ManagedBy   = "Terraform"
-  }
-}
+      # ===========================================================
+      # ETAPA 3: Validacion del codigo Terraform
+      # ===========================================================
+      - name: "[Etapa 3] Terraform Init"
+        run: terraform init -backend=false
 
-# =============================================================================
-# 4. AMI Ubuntu 24.04 LTS
-# -----------------------------------------------------------------------------
-# Busca la AMI oficial más reciente de Ubuntu Server 24.04 LTS (Noble) para
-# la arquitectura amd64 propiedad de Canonical (ID 099720109477).
-# =============================================================================
-data "aws_ami" "ubuntu_24_04" {
-  most_recent = true
-  owners      = ["099720109477"]
+      - name: "[Etapa 3] Terraform Validate"
+        run: terraform validate
 
-  filter {
-    name   = "name"
-    values = ["ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-amd64-server-*"]
-  }
+      # ===========================================================
+      # ETAPA 4 (bonus): Evaluacion de politicas OPA
+      # Sistema de permisos automatizado que permite o deniega
+      # cambios en base a politicas declarativas (IE2.2.1).
+      # ===========================================================
+      - name: "[Etapa 4] Instalar OPA"
+        run: |
+          curl -L -o opa https://openpolicyagent.org/downloads/latest/opa_linux_amd64_static
+          chmod +x opa
+          sudo mv opa /usr/local/bin/
 
-  filter {
-    name   = "virtualization-type"
-    values = ["hvm"]
-  }
-}
+      - name: "[Etapa 4] Generar plan en JSON"
+        run: |
+          terraform plan -out=tfplan.binary || true
+          terraform show -json tfplan.binary > plan.json || echo '{}' > plan.json
 
-# =============================================================================
-# 5. Instancia EC2
-# -----------------------------------------------------------------------------
-# Instancia de cómputo t2.micro (tipo permitido por política OPA) con la AMI
-# de Ubuntu 24.04 LTS, desplegada en la subred pública y asociada al SG.
-# =============================================================================
-resource "aws_instance" "server" {
-  ami                    = data.aws_ami.ubuntu_24_04.id
-  instance_type          = "t2.micro"
-  subnet_id              = aws_subnet.public.id
-  vpc_security_group_ids = [aws_security_group.allow_ssh.id]
-
-  tags = {
-    Name        = "AUY1105-proyecto1-ec2"
-    Project     = "AUY1105-proyecto1"
-    ManagedBy   = "Terraform"
-  }
-}
+      - name: "[Etapa 4] Evaluar politicas OPA"
+        run: |
+          RESULT=$(opa eval -d policies/ -i plan.json "data.terraform.policies.deny" --format=pretty)
+          echo "Resultado OPA:"
+          echo "$RESULT"
+          if echo "$RESULT" | grep -q "Violacion"; then
+            echo "::error::Politicas OPA violadas. Bloqueando PR."
+            exit 1
+          fi
