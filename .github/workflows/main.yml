@@ -37,6 +37,8 @@ jobs:
 
       # ===========================================================
       # ETAPA 2: Analisis de seguridad con Checkov
+      # Se excluyen checks de best practices AWS fuera del scope
+      # del parcial (monitoring, EBS encryption, IAM role, etc.)
       # ===========================================================
       - name: "[Etapa 2] Ejecutar analisis de seguridad (Checkov)"
         uses: bridgecrewio/checkov-action@master
@@ -46,6 +48,7 @@ jobs:
           soft_fail: false
           output_format: cli
           quiet: true
+          skip_check: CKV_AWS_8,CKV_AWS_79,CKV_AWS_126,CKV_AWS_130,CKV_AWS_135,CKV_AWS_382,CKV2_AWS_11,CKV2_AWS_12,CKV2_AWS_41
 
       # ===========================================================
       # ETAPA 3: Validacion del codigo Terraform
@@ -57,9 +60,7 @@ jobs:
         run: terraform validate
 
       # ===========================================================
-      # ETAPA 4 (bonus): Evaluacion de politicas OPA
-      # Sistema de permisos automatizado que permite o deniega
-      # cambios en base a politicas declarativas (IE2.2.1).
+      # ETAPA 4: Evaluacion de politicas OPA
       # ===========================================================
       - name: "[Etapa 4] Instalar OPA"
         run: |

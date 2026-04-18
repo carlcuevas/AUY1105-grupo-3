@@ -11,8 +11,9 @@ package terraform.policies
 #   Recurso de tipo aws_instance cuyo instance_type sea distinto de "t2.micro".
 #
 # Indicador evaluado: IL2.1 (Politicas de seguridad)
+# Compatibilidad: Rego v1 (OPA >= 1.0)
 # =============================================================================
-deny[msg] {
+deny contains msg if {
     resource := input.resource_changes[_]
     resource.type == "aws_instance"
     resource.change.after.instance_type != "t2.micro"
