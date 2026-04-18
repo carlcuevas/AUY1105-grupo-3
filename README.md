@@ -88,3 +88,5 @@ Siguiendo los requerimientos de la rúbrica (IL 1.1), el trabajo se gestionó me
 ├── CHANGELOG.md         # Registro histórico de versiones y cambios
 ├── main.tf              # Definición de recursos en AWS
 └── README.md            # Documentación técnica principal
+
+<img width="1026" height="641" alt="imagen" src="https://github.com/user-attachments/assets/ab766a2d-aa10-4c53-916e-3edfac9993bb" />
