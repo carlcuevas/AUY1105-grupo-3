@@ -14,8 +14,9 @@ package terraform.policies
 #     - cidr_blocks contenga "0.0.0.0/0"
 #
 # Indicador evaluado: IL2.1 (Politicas de seguridad)
+# Compatibilidad: Rego v1 (OPA >= 1.0)
 # =============================================================================
-deny[msg] {
+deny contains msg if {
     resource := input.resource_changes[_]
     resource.type == "aws_security_group"
     ingress := resource.change.after.ingress[_]
