@@ -159,3 +159,40 @@ AUY1105-grupo-3/
 | **IL2.1** — Políticas de seguridad | `policies/*.rego` |
 | **IE2.2.1** — Sistema de permisos automatizado | Etapa 4 del workflow |
 | **IE2.3.1** — Pruebas de políticas | `tests/` + `evidencias/04-06-*.txt` |
+
+
+---
+
+## 📷 Capturas de Evidencia Visual
+
+Capturas de pantalla del repositorio y pipeline de GitHub Actions que complementan las evidencias en texto.
+
+### Vista del repositorio
+
+![Vista del repositorio en GitHub](evidencias/capturas/01-repo-home.png)
+
+### Pull Requests con revisiones cruzadas
+
+Lista completa de PRs cerradas con autores y revisores visibles:
+
+![Lista de Pull Requests cerradas](evidencias/capturas/02-prs-cerradas.png)
+
+Detalle de las PRs de Daniel revisadas por Carlos:
+
+**PR #8 — Fix políticas OPA a Rego v1**
+
+![PR #8 con comentarios de Carlos](evidencias/capturas/03-pr8-review-carlos.png)
+
+**PR #9 — Documentación: tests y evidencias**
+
+![PR #9 con comentarios de Carlos](evidencias/capturas/04-pr9-review-carlos.png)
+
+**PR #10 — Update README**
+
+![PR #10 con comentarios de Carlos](evidencias/capturas/05-pr10-review-carlos.png)
+
+### Pipeline de CI/CD (GitHub Actions)
+
+Historial de workflows ejecutados, todos en verde:
+
+![GitHub Actions con workflows en verde](evidencias/capturas/06-github-actions-verdes.png)
