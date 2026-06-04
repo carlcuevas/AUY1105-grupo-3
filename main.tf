@@ -1,3 +1,9 @@
+# =============================================================================
+# AUY1105 — Evaluación Parcial 2 — Repositorio Principal
+# -----------------------------------------------------------------------------
+# Orquesta los módulos desacoplados de redes, cómputo y almacenamiento.
+# =============================================================================
+
 terraform {
   required_version = ">= 1.2.0"
   required_providers {
@@ -9,115 +15,56 @@ terraform {
 }
 
 provider "aws" {
-  region = "us-east-1"
+  region = var.aws_region
 }
 
 # =============================================================================
-# 1. VPC
-# -----------------------------------------------------------------------------
-# Virtual Private Cloud aislada para alojar la infraestructura del proyecto.
-# CIDR 10.1.0.0/16 según requerimiento de la pauta.
+# Módulo de Redes
+# Fuente: https://github.com/recouma/terraform-aws-vpc-auy1105-grupo-3
 # =============================================================================
-resource "aws_vpc" "main" {
-  cidr_block           = "10.1.0.0/16"
-  enable_dns_support   = true
-  enable_dns_hostnames = true
+module "red" {
+  source = "github.com/recouma/terraform-aws-vpc-auy1105-grupo-3?ref=v1.0.0"
 
-  tags = {
-    Name        = "AUY1105-proyecto1-vpc"
-    Project     = "AUY1105-proyecto1"
-    ManagedBy   = "Terraform"
-  }
+  vpc_cidr     = var.vpc_cidr
+  project_name = var.project_name
+
+  public_subnets   = var.public_subnets
+  sg_ingress_rules = var.sg_ingress_rules
+
+  common_tags = local.common_tags
 }
 
 # =============================================================================
-# 2. Subred pública (/24)
-# -----------------------------------------------------------------------------
-# Segmento de red /24 dentro de la VPC para los recursos de cómputo.
+# Módulo de Cómputo
+# Fuente: https://github.com/recouma/terraform-aws-ec2-auy1105-grupo-3
 # =============================================================================
-resource "aws_subnet" "public" {
-  vpc_id                  = aws_vpc.main.id
-  cidr_block              = "10.1.1.0/24"
-  map_public_ip_on_launch = true
+module "computo" {
+  source = "github.com/recouma/terraform-aws-ec2-auy1105-grupo-3?ref=v1.0.0"
 
-  tags = {
-    Name        = "AUY1105-proyecto1-sn-pub"
-    Project     = "AUY1105-proyecto1"
-    ManagedBy   = "Terraform"
-  }
+  instance_type      = var.instance_type
+  subnet_id          = module.red.subnet_ids[0]
+  security_group_ids = [module.red.security_group_id]
+  project_name       = var.project_name
+
+  common_tags = local.common_tags
 }
 
 # =============================================================================
-# 3. Security Group
-# -----------------------------------------------------------------------------
-# Controla el tráfico entrante y saliente. Solo permite SSH entrante desde
-# el bloque CIDR de la propia VPC (10.1.0.0/16), cumpliendo la política OPA
-# que prohíbe SSH abierto a 0.0.0.0/0.
+# Módulo de Almacenamiento
+# Fuente: https://github.com/recouma/terraform-aws-s3-auy1105-grupo-3
 # =============================================================================
-resource "aws_security_group" "allow_ssh" {
-  name        = "AUY1105-proyecto1-sg"
-  description = "Permite trafico SSH restringido al bloque de la VPC"
-  vpc_id      = aws_vpc.main.id
+module "almacenamiento" {
+  source = "github.com/recouma/terraform-aws-s3-auy1105-grupo-3?ref=v1.0.0"
 
-  ingress {
-    description = "SSH desde la VPC"
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = ["10.1.0.0/16"]
-  }
+  bucket_name  = var.bucket_name
+  project_name = var.project_name
 
-  egress {
-    description = "Trafico saliente permitido"
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = {
-    Name        = "AUY1105-proyecto1-sg"
-    Project     = "AUY1105-proyecto1"
-    ManagedBy   = "Terraform"
-  }
+  common_tags = local.common_tags
 }
 
-# =============================================================================
-# 4. AMI Ubuntu 24.04 LTS
-# -----------------------------------------------------------------------------
-# Busca la AMI oficial más reciente de Ubuntu Server 24.04 LTS (Noble) para
-# la arquitectura amd64 propiedad de Canonical (ID 099720109477).
-# =============================================================================
-data "aws_ami" "ubuntu_24_04" {
-  most_recent = true
-  owners      = ["099720109477"]
-
-  filter {
-    name   = "name"
-    values = ["ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-amd64-server-*"]
-  }
-
-  filter {
-    name   = "virtualization-type"
-    values = ["hvm"]
-  }
-}
-
-# =============================================================================
-# 5. Instancia EC2
-# -----------------------------------------------------------------------------
-# Instancia de cómputo t2.micro (tipo permitido por política OPA) con la AMI
-# de Ubuntu 24.04 LTS, desplegada en la subred pública y asociada al SG.
-# =============================================================================
-resource "aws_instance" "server" {
-  ami                    = data.aws_ami.ubuntu_24_04.id
-  instance_type          = "t2.micro"
-  subnet_id              = aws_subnet.public.id
-  vpc_security_group_ids = [aws_security_group.allow_ssh.id]
-
-  tags = {
-    Name        = "AUY1105-proyecto1-ec2"
-    Project     = "AUY1105-proyecto1"
-    ManagedBy   = "Terraform"
+locals {
+  common_tags = {
+    Project   = var.project_name
+    ManagedBy = "Terraform"
   }
 }
